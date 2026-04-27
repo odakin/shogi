@@ -32,4 +32,6 @@
 
 **Why**: ドメインが完全に直交。pharmacy 側に置き続けると `Auto: update data` の cron commit に混ざって履歴が読みづらくなる、`docs/` ディレクトリの用途を曖昧にする、`gh-pages` 設定の干渉リスクなど。
 
-**経緯**: 前セッション（online Claude）で誤って pharmacy リポのブランチ `claude/shogi-game-viewer-3vQBu` に commit `c81b4bc` として置いてしまい、削除コミット `c43ebb1` で消した。本リポはその commit から `docs/shogi/index.html` を `git show` で復元して作成。pharmacy 側のブランチは origin から削除（中身ゼロ・net diff zero）。
+**経緯**: 前セッション（online Claude）で誤って pharmacy リポのブランチ `claude/shogi-game-viewer-3vQBu` に commit してしまい、続く削除コミットで消した（net diff zero）。本リポはその追加コミットから `docs/shogi/index.html` を `git show` で復元して作成。pharmacy 側のブランチは origin から削除済。
+
+なお初期 commit message には当時 reachable だった追加コミットの hash 引用が残るが、orphan branch 削除でやがて GC 対象となり dead reference 化する。snapshot 原理上は記録時点の reachable hash と割り切ってよい（rewrite には force push が必要で §4 違反のため）。

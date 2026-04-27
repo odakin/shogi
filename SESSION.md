@@ -2,7 +2,7 @@
 
 ## 現在の状態
 
-**2026-04-27**: 初回 commit。`mhlw-ec-pharmacy-finder` のブランチ `claude/shogi-game-viewer-3vQBu`（commit `c81b4bc`）に誤コミットされていた `docs/shogi/index.html` を独立リポ化して移動。`index.html` は中身を触らずそのまま保存（前セッションで Node による全 89 手合法性検証済）。
+**2026-04-27**: 初回 commit。`mhlw-ec-pharmacy-finder` の orphan branch `claude/shogi-game-viewer-3vQBu`（origin から削除済）に誤コミットされていた `docs/shogi/index.html` を独立リポ化して移動。`index.html` は中身を触らずそのまま保存（前セッションで Node による全 89 手合法性検証済）。
 
 ## Open items
 
