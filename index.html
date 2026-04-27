@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>棋譜ビューア — 第84期名人戦 第2局</title>
+<style>
+  :root {
+    --board-bg: #f4d292;
+    --board-line: #4a3520;
+    --board-edge: #2b1c0d;
+    --komadai-bg: #ead0a0;
+    --highlight: rgba(255, 200, 0, 0.55);
+    --last-from: rgba(180, 180, 255, 0.45);
+    --text: #1a1a1a;
+    --bg: #f7f3ec;
+    --accent: #8b1a1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .meta { font-size: 13px; color: #555; margin-bottom: 12px; }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 560px) minmax(220px, 320px);
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .board-area {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .komadai {
+    background: var(--komadai-bg);
+    border: 2px solid var(--board-edge);
+    border-radius: 4px;
+    padding: 6px 8px;
+    min-height: 38px;
+    font-size: 18px;
+    line-height: 1.4;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .komadai .label {
+    font-size: 12px;
+    color: #555;
+    margin-right: 6px;
+  }
+  .komadai .empty { color: #999; font-size: 13px; }
+  .komadai.gote .piece { transform: rotate(180deg); display: inline-block; }
+
+  .board-wrap {
+    background: var(--board-bg);
+    border: 3px solid var(--board-edge);
+    border-radius: 2px;
+    padding: 22px 22px 22px 22px;
+    position: relative;
+    aspect-ratio: 1 / 1;
+  }
+  .board-wrap .files,
+  .board-wrap .ranks {
+    position: absolute;
+    display: flex;
+    color: #5a3a1a;
+    font-size: 11px;
+    font-family: sans-serif;
+  }
+  .board-wrap .files { top: 4px; left: 22px; right: 22px; justify-content: space-around; }
+  .board-wrap .ranks { top: 22px; bottom: 22px; right: 4px; flex-direction: column; justify-content: space-around; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    width: 100%;
+    height: 100%;
+    background:
+      linear-gradient(to right, var(--board-line) 1px, transparent 1px) 0 0 / calc(100%/9) 100%,
+      linear-gradient(to bottom, var(--board-line) 1px, transparent 1px) 0 0 / 100% calc(100%/9),
+      var(--board-bg);
+    border: 1.5px solid var(--board-line);
+    position: relative;
+  }
+  .cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(16px, 4vw, 26px);
+    line-height: 1;
+    user-select: none;
+  }
+  .cell.last-to { background: var(--highlight); }
+  .cell.last-from { background: var(--last-from); }
+  .piece {
+    display: inline-block;
+    transition: transform 0.05s;
+  }
+  .piece.gote { transform: rotate(180deg); }
+  .piece.promoted { color: var(--accent); }
+  .piece.compact { font-size: 0.7em; letter-spacing: -0.1em; }
+
+  /* star points (星) at 4 corners of the central 3x3 */
+  .grid::before, .grid::after,
+  .star1, .star2 {
+    content: '';
+    position: absolute;
+    width: 6px; height: 6px;
+    background: var(--board-line);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .grid::before { left: calc(100%/9 * 3); top: calc(100%/9 * 3); }
+  .grid::after  { left: calc(100%/9 * 6); top: calc(100%/9 * 3); }
+  .star1        { left: calc(100%/9 * 3); top: calc(100%/9 * 6); }
+  .star2        { left: calc(100%/9 * 6); top: calc(100%/9 * 6); }
+
+  .controls {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .controls button {
+    font: inherit;
+    padding: 6px 10px;
+    border: 1px solid #888;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: #efe6d0; }
+  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .controls .move-no {
+    margin-left: auto;
+    font-size: 13px;
+    color: #444;
+  }
+  .controls input[type=range] { flex: 1 1 120px; }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .move-list {
+    border: 1px solid #bbb;
+    background: #fff;
+    border-radius: 4px;
+    max-height: 60vh;
+    overflow-y: auto;
+    font-size: 13px;
+    font-family: "Hiragino Mincho ProN", serif;
+  }
+  .move-list ol {
+    list-style: none;
+    padding: 0; margin: 0;
+  }
+  .move-list li {
+    padding: 4px 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    gap: 6px;
+  }
+  .move-list li:hover { background: #fffbe6; }
+  .move-list li.current { background: #ffe8a8; font-weight: bold; }
+  .move-list li.sealed { font-style: italic; }
+  .move-list li .num {
+    min-width: 28px;
+    text-align: right;
+    color: #888;
+    font-family: sans-serif;
+  }
+  .info {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #333;
+  }
+  .info b { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>第84期名人戦七番勝負 第2局</h1>
+<div class="meta">
+  ▲藤井聡太名人 − △糸谷哲郎九段 ／ 2026年4月25-26日 ホテル青森
+  ／ 封じ手 37手目 ▲56歩 ／ 89手で先手の勝ち
+</div>
+
+<div class="layout">
+  <div class="board-area">
+    <div class="komadai gote" id="komadaiGote" aria-label="後手駒台">
+      <span class="label">△持駒：</span><span class="contents"></span>
+    </div>
+    <div class="board-wrap">
+      <div class="files" id="files"></div>
+      <div class="ranks" id="ranks"></div>
+      <div class="grid" id="grid">
+        <span class="star1"></span><span class="star2"></span>
+      </div>
+    </div>
+    <div class="komadai sente" id="komadaiSente" aria-label="先手駒台">
+      <span class="label">▲持駒：</span><span class="contents"></span>
+    </div>
+    <div class="controls">
+      <button id="btnStart" title="開始局面">|◀</button>
+      <button id="btnPrev" title="1手戻る">◀</button>
+      <button id="btnPlay" title="自動再生">▶</button>
+      <button id="btnNext" title="1手進める">▶|</button>
+      <button id="btnEnd" title="最終局面">▶▶|</button>
+      <span class="move-no" id="moveNo">0 / 89</span>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="info">
+      盤上の指し手をクリックすると、その局面まで進みます。
+      <span style="color:var(--accent)">赤字</span>は成駒。黄色マスは直前の着手地点。
+    </div>
+    <div class="move-list" id="moveList"></div>
+    <div class="info" id="status"></div>
+  </aside>
+</div>
+
+<script>
+// --- Kifu data -------------------------------------------------------------
+const KIFU = `
+1 ▲26歩    2 △34歩    3 ▲76歩    4 △32金
+5 ▲25歩    6 △42銀    7 ▲24歩    8 △同歩
+9 ▲同飛   10 △33銀   11 ▲25飛   12 △23歩
+13 ▲38銀   14 △84歩   15 ▲78金   16 △85歩
+17 ▲66角   18 △44銀   19 ▲77桂   20 △35歩
+21 ▲56歩   22 △54歩   23 ▲46歩   24 △14歩
+25 ▲47銀   26 △52飛   27 ▲69玉   28 △55歩
+29 ▲同歩   30 △同銀   31 ▲48角   32 △13角
+33 ▲68銀   34 △62玉   35 ▲16歩   36 △54飛
+37 ▲56歩(封)
+38 △同銀   39 ▲55歩   40 △同飛   41 ▲66角
+42 △52飛   43 ▲56銀   44 △33桂   45 ▲同角成
+46 △同金   47 ▲47銀   48 △44歩   49 ▲15歩
+50 △24角   51 ▲14歩   52 △43金   53 ▲15銀
+54 △17歩   55 ▲同香   56 △15角   57 ▲同香
+58 △16角   59 ▲23飛成 60 △34銀   61 ▲27角
+62 △23銀   63 ▲16角   64 △25歩   65 ▲同角
+66 △34金   67 ▲43角   68 △25金   69 ▲同角成
+70 △86歩   71 ▲53歩   72 △51飛   73 ▲65桂
+74 △87歩成 75 ▲同金   76 △89飛   77 ▲79桂
+78 △34角   79 ▲同馬   80 △同銀   81 ▲33角
+82 △21飛   83 ▲44角成 84 △29飛成 85 ▲52歩成
+86 △72玉   87 ▲61と   88 △49龍   89 ▲59歩
+`;
+
+// --- Piece definitions -----------------------------------------------------
+// kanji → internal type. Promoted forms map to base type with promoted flag.
+const KANJI_TO_TYPE = {
+  '歩': 'P', '香': 'L', '桂': 'N', '銀': 'S',
+  '金': 'G', '角': 'B', '飛': 'R', '玉': 'K', '王': 'K',
+  'と': '+P', '杏': '+L', '圭': '+N', '全': '+S',
+  '馬': '+B', '龍': '+R', '竜': '+R',
+};
+// Display kanji
+const TYPE_TO_KANJI = {
+  'P':'歩','L':'香','N':'桂','S':'銀','G':'金','B':'角','R':'飛','K':'玉',
+  '+P':'と','+L':'成香','+N':'成桂','+S':'成銀','+B':'馬','+R':'龍',
+};
+
+// "成香" "成桂" "成銀" tokens — multi-char promoted notations
+const PROMOTED_TOKENS = { '成香':'+L', '成桂':'+N', '成銀':'+S' };
+
+// Move deltas (df, dr) from sente perspective (forward = -dr).
+// Flip dr for gote.
+const GOLD_STEPS = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[0,1]];
+const KING_STEPS = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+const MOVES = {
+  'P':  { steps: [[0,-1]] },
+  'L':  { slides: [[0,-1]] },
+  'N':  { steps: [[-1,-2],[1,-2]] },
+  'S':  { steps: [[-1,-1],[0,-1],[1,-1],[-1,1],[1,1]] },
+  'G':  { steps: GOLD_STEPS },
+  'K':  { steps: KING_STEPS },
+  'B':  { slides: [[-1,-1],[1,-1],[-1,1],[1,1]] },
+  'R':  { slides: [[0,-1],[-1,0],[1,0],[0,1]] },
+  '+P': { steps: GOLD_STEPS },
+  '+L': { steps: GOLD_STEPS },
+  '+N': { steps: GOLD_STEPS },
+  '+S': { steps: GOLD_STEPS },
+  '+B': { slides: [[-1,-1],[1,-1],[-1,1],[1,1]], steps: [[0,-1],[0,1],[-1,0],[1,0]] },
+  '+R': { slides: [[0,-1],[-1,0],[1,0],[0,1]], steps: [[-1,-1],[1,-1],[-1,1],[1,1]] },
+};
+
+function basetype(t) { return t.startsWith('+') ? t.slice(1) : t; }
+
+// --- Initial board ---------------------------------------------------------
+// board[rank-1][file-1] = { type, color } | null. file 1 on the right (display),
+// rank 1 at the top (gote side).
+function initialBoard() {
+  const b = Array.from({length:9}, () => Array(9).fill(null));
+  // Gote back rank (rank 1)
+  const back = ['L','N','S','G','K','G','S','N','L']; // file 9..1 → indices 0..8 if file9 left
+  // We'll store using file index = file - 1 (so file 1 → idx 0).
+  // Then file 9 is idx 8 (left side of board visually).
+  // Back rank pieces: file 9..1 → 香桂銀金玉金銀桂香
+  for (let f = 1; f <= 9; f++) {
+    b[0][f-1] = { type: back[9-f], color: 'g' };
+  }
+  b[1][8-1] = { type: 'R', color: 'g' }; // gote rook at 82 (file 8, rank 2)
+  b[1][2-1] = { type: 'B', color: 'g' }; // gote bishop at 22
+  for (let f = 1; f <= 9; f++) b[2][f-1] = { type: 'P', color: 'g' };
+  // Sente
+  for (let f = 1; f <= 9; f++) b[6][f-1] = { type: 'P', color: 's' };
+  b[7][2-1] = { type: 'R', color: 's' }; // 28 飛
+  b[7][8-1] = { type: 'B', color: 's' }; // 88 角
+  for (let f = 1; f <= 9; f++) {
+    b[8][f-1] = { type: back[9-f], color: 's' };
+  }
+  return b;
+}
+
+// --- Kifu parser -----------------------------------------------------------
+function parseKifu(text) {
+  // strip whitespace, split tokens like "▲26歩" or "△同歩" or "▲56歩(封)"
+  const re = /([▲△])([1-9１-９]\d?|同)?([歩香桂銀金角飛玉王と馬龍竜]|成香|成桂|成銀)(成|不成)?(打)?/g;
+  // Actually the file/rank are two digits. Let me make a clearer regex.
+  const re2 = /([▲△])(同|[1-9][1-9])([歩香桂銀金角飛玉王と馬龍竜]|成香|成桂|成銀)(成|不成)?(打)?(\(封\))?/g;
+  const moves = [];
+  let m;
+  while ((m = re2.exec(text)) !== null) {
+    moves.push({
+      side: m[1] === '▲' ? 's' : 'g',
+      dest: m[2], // "同" or "FR" two digits
+      pieceK: m[3], // kanji
+      promote: m[4] === '成',
+      decline: m[4] === '不成',
+      drop: m[5] === '打',
+      sealed: !!m[6],
+      raw: m[0],
+      origRaw: m[0], // keep original for display (drop flag may be inferred later)
+    });
+  }
+  return moves;
+}
+
+function pieceTypeFromKanji(k) {
+  if (PROMOTED_TOKENS[k]) return PROMOTED_TOKENS[k];
+  return KANJI_TO_TYPE[k];
+}
+
+// --- Move resolver ---------------------------------------------------------
+function inBoard(f, r) { return f >= 1 && f <= 9 && r >= 1 && r <= 9; }
+
+function reachableSquares(board, fromF, fromR) {
+  // Returns list of [f, r] that the piece at (fromF, fromR) can move to.
+  const sq = board[fromR-1][fromF-1];
+  if (!sq) return [];
+  const def = MOVES[sq.type];
+  const flip = sq.color === 'g' ? -1 : 1;
+  const out = [];
+  if (def.steps) {
+    for (const [df, dr] of def.steps) {
+      const nf = fromF + df, nr = fromR + dr * flip;
+      if (!inBoard(nf, nr)) continue;
+      const occ = board[nr-1][nf-1];
+      if (occ && occ.color === sq.color) continue;
+      out.push([nf, nr]);
+    }
+  }
+  if (def.slides) {
+    for (const [df, dr] of def.slides) {
+      let nf = fromF, nr = fromR;
+      while (true) {
+        nf += df; nr += dr * flip;
+        if (!inBoard(nf, nr)) break;
+        const occ = board[nr-1][nf-1];
+        if (occ && occ.color === sq.color) break;
+        out.push([nf, nr]);
+        if (occ) break; // capture, then stop
+      }
+    }
+  }
+  return out;
+}
+
+function findFrom(board, color, type, toF, toR) {
+  const matches = [];
+  for (let r = 1; r <= 9; r++) {
+    for (let f = 1; f <= 9; f++) {
+      const sq = board[r-1][f-1];
+      if (!sq || sq.color !== color || sq.type !== type) continue;
+      if (reachableSquares(board, f, r).some(([nf,nr]) => nf===toF && nr===toR)) {
+        matches.push([f, r]);
+      }
+    }
+  }
+  return matches;
+}
+
+// --- Apply move; returns {fromF, fromR, toF, toR, captured, promoted, drop} ---
+function applyMove(state, mv, prevDest) {
+  let toF, toR;
+  if (mv.dest === '同') {
+    if (!prevDest) throw new Error('同 with no previous move');
+    [toF, toR] = prevDest;
+  } else {
+    toF = parseInt(mv.dest[0], 10);
+    toR = parseInt(mv.dest[1], 10);
+  }
+  const targetType = pieceTypeFromKanji(mv.pieceK);
+  // Determine the *moving* piece type (before promotion).
+  // If mv.promote (suffix 成), then the moving piece is the unpromoted form
+  // of targetType; targetType here is base. e.g. "23飛成" → moving R, becomes +R.
+  // If pieceK is already a promoted kanji (馬/龍/と/成X), the moving piece is
+  // the same promoted type (no further promotion).
+  const movingType = targetType;
+  const isPromotedKanji = targetType.startsWith('+');
+
+  // Drop?
+  let from = null;
+  if (!mv.drop) {
+    // Try to find an existing piece on the board that can move there.
+    const candidates = findFrom(state.board, mv.side, movingType, toF, toR);
+    if (candidates.length === 0) {
+      // No legal move-source → must be a drop (notation omitted 打).
+      mv.drop = true;
+    } else if (candidates.length === 1) {
+      from = candidates[0];
+    } else {
+      // Multiple candidates — kifu should have disambiguated.
+      // Fall back: pick the one with smallest |df|+|dr| (closest), best effort.
+      candidates.sort((a, b) => {
+        const da = Math.abs(a[0]-toF) + Math.abs(a[1]-toR);
+        const db = Math.abs(b[0]-toF) + Math.abs(b[1]-toR);
+        return da - db;
+      });
+      from = candidates[0];
+    }
+  }
+
+  let captured = null;
+  if (mv.drop) {
+    // Take a piece of base type from hand.
+    const base = basetype(movingType);
+    const hand = state.hands[mv.side];
+    if (!hand[base] || hand[base] <= 0) {
+      throw new Error(`Drop ${TYPE_TO_KANJI[movingType]} with empty hand at move ${state.moveIdx+1}`);
+    }
+    hand[base]--;
+    state.board[toR-1][toF-1] = { type: movingType, color: mv.side };
+    return { fromF: null, fromR: null, toF, toR, captured: null, promoted: false, drop: true };
+  }
+
+  const [fromF, fromR] = from;
+  const moving = state.board[fromR-1][fromF-1];
+  // Capture
+  const occupied = state.board[toR-1][toF-1];
+  if (occupied) {
+    captured = occupied;
+    // Add base type to mover's hand
+    const base = basetype(occupied.type);
+    state.hands[mv.side][base] = (state.hands[mv.side][base] || 0) + 1;
+  }
+  let newType = moving.type;
+  if (mv.promote) {
+    newType = '+' + basetype(newType);
+  } else if (isPromotedKanji && !moving.type.startsWith('+')) {
+    // e.g. 87歩成 → already handled by mv.promote.  Notation like "▲同馬"
+    // means horse (already promoted bishop) moves; verify type matches.
+    newType = movingType;
+  }
+  state.board[fromR-1][fromF-1] = null;
+  state.board[toR-1][toF-1] = { type: newType, color: moving.color };
+  return { fromF, fromR, toF, toR, captured, promoted: mv.promote, drop: false };
+}
+
+// --- State at move N (replay from start) ----------------------------------
+function buildHistory(moves) {
+  const states = []; // states[i] = state AFTER move i (0 = initial)
+  const init = {
+    board: initialBoard(),
+    hands: { s: {}, g: {} },
+    last: null,
+    moveIdx: -1,
+  };
+  // Deep-copyable serializer
+  function snapshot(s) {
+    return {
+      board: s.board.map(row => row.map(c => c ? {...c} : null)),
+      hands: { s: {...s.hands.s}, g: {...s.hands.g} },
+      last: s.last ? {...s.last} : null,
+      moveIdx: s.moveIdx,
+    };
+  }
+  states.push(snapshot(init));
+  let cur = snapshot(init);
+  let prevDest = null;
+  for (let i = 0; i < moves.length; i++) {
+    cur.moveIdx = i;
+    const r = applyMove(cur, moves[i], prevDest);
+    cur.last = r;
+    prevDest = [r.toF, r.toR];
+    states.push(snapshot(cur));
+  }
+  return states;
+}
+
+// --- Rendering -------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const FILE_LABELS = ['9','8','7','6','5','4','3','2','1'];
+const RANK_LABELS = ['一','二','三','四','五','六','七','八','九'];
+
+function renderFilesRanks() {
+  $('files').innerHTML = FILE_LABELS.map(f => `<span>${f}</span>`).join('');
+  $('ranks').innerHTML = RANK_LABELS.map(r => `<span>${r}</span>`).join('');
+}
+
+function renderBoard(state) {
+  const grid = $('grid');
+  // Clear cells (preserve star points)
+  grid.querySelectorAll('.cell').forEach(c => c.remove());
+  // visual order: row=rank 1..9 (top→bottom), col=file 9..1 (left→right)
+  for (let r = 1; r <= 9; r++) {
+    for (let visCol = 0; visCol < 9; visCol++) {
+      const f = 9 - visCol;
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.f = f; cell.dataset.r = r;
+      const sq = state.board[r-1][f-1];
+      if (sq) {
+        const span = document.createElement('span');
+        const kanji = TYPE_TO_KANJI[sq.type];
+        span.className = 'piece' + (sq.color === 'g' ? ' gote' : '')
+          + (sq.type.startsWith('+') ? ' promoted' : '')
+          + (kanji.length > 1 ? ' compact' : '');
+        span.textContent = kanji;
+        cell.appendChild(span);
+      }
+      if (state.last) {
+        if (state.last.toF === f && state.last.toR === r) cell.classList.add('last-to');
+        if (state.last.fromF === f && state.last.fromR === r) cell.classList.add('last-from');
+      }
+      grid.appendChild(cell);
+    }
+  }
+}
+
+const HAND_ORDER = ['R','B','G','S','N','L','P'];
+
+function renderKomadai(state) {
+  for (const side of ['s','g']) {
+    const el = $(side === 's' ? 'komadaiSente' : 'komadaiGote').querySelector('.contents');
+    const h = state.hands[side];
+    const parts = [];
+    for (const t of HAND_ORDER) {
+      const n = h[t] || 0;
+      if (n > 0) parts.push(`<span class="piece">${TYPE_TO_KANJI[t]}${n>1?numToKanji(n):''}</span>`);
+    }
+    el.innerHTML = parts.length ? parts.join('') : '<span class="empty">なし</span>';
+  }
+}
+
+function numToKanji(n) {
+  const K = ['','一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八'];
+  return K[n] || String(n);
+}
+
+function renderMoveList(moves, idx) {
+  const ol = document.createElement('ol');
+  for (let i = 0; i < moves.length; i++) {
+    const li = document.createElement('li');
+    li.className = (i === idx - 1 ? 'current' : '') + (moves[i].sealed ? ' sealed' : '');
+    li.innerHTML = `<span class="num">${i+1}</span><span>${moves[i].origRaw}</span>`;
+    li.addEventListener('click', () => goTo(i + 1));
+    ol.appendChild(li);
+  }
+  $('moveList').innerHTML = '';
+  $('moveList').appendChild(ol);
+  // scroll current into view
+  const cur = ol.querySelector('.current');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+// --- App state -------------------------------------------------------------
+let MOVES_LIST, STATES, idx = 0, playTimer = null;
+
+function render() {
+  const s = STATES[idx];
+  renderBoard(s);
+  renderKomadai(s);
+  renderMoveList(MOVES_LIST, idx);
+  $('moveNo').textContent = `${idx} / ${MOVES_LIST.length}`;
+  $('btnPrev').disabled = idx === 0;
+  $('btnStart').disabled = idx === 0;
+  $('btnNext').disabled = idx === MOVES_LIST.length;
+  $('btnEnd').disabled = idx === MOVES_LIST.length;
+
+  // Status
+  const status = $('status');
+  if (idx === 0) {
+    status.textContent = '開始局面（平手）';
+  } else {
+    const mv = MOVES_LIST[idx-1];
+    const sideName = mv.side === 's' ? '先手' : '後手';
+    const last = s.last;
+    let line = `${idx}手目 ${mv.origRaw}`;
+    if (mv.sealed) line += '（封じ手）';
+    if (last && last.captured) line += ` — ${TYPE_TO_KANJI[last.captured.type]}を取得`;
+    if (idx === MOVES_LIST.length) line += ' / 投了：先手の勝ち';
+    status.textContent = line;
+  }
+}
+
+function goTo(n) {
+  idx = Math.max(0, Math.min(MOVES_LIST.length, n));
+  render();
+}
+function next() { if (idx < MOVES_LIST.length) goTo(idx+1); }
+function prev() { if (idx > 0) goTo(idx-1); }
+function play() {
+  if (playTimer) {
+    clearInterval(playTimer);
+    playTimer = null;
+    $('btnPlay').textContent = '▶';
+    return;
+  }
+  $('btnPlay').textContent = '❚❚';
+  playTimer = setInterval(() => {
+    if (idx >= MOVES_LIST.length) { play(); return; }
+    next();
+  }, 700);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') next();
+  else if (e.key === 'ArrowLeft') prev();
+  else if (e.key === 'Home') goTo(0);
+  else if (e.key === 'End') goTo(MOVES_LIST.length);
+  else if (e.key === ' ') { play(); e.preventDefault(); }
+});
+
+// --- Boot ------------------------------------------------------------------
+function boot() {
+  renderFilesRanks();
+  MOVES_LIST = parseKifu(KIFU);
+  try {
+    STATES = buildHistory(MOVES_LIST);
+  } catch (e) {
+    console.error(e);
+    $('status').textContent = '棋譜の解析に失敗しました: ' + e.message;
+    return;
+  }
+  $('btnStart').addEventListener('click', () => goTo(0));
+  $('btnPrev').addEventListener('click', prev);
+  $('btnNext').addEventListener('click', next);
+  $('btnEnd').addEventListener('click', () => goTo(MOVES_LIST.length));
+  $('btnPlay').addEventListener('click', play);
+  goTo(0);
+}
+boot();
+</script>
+</body>
+</html>

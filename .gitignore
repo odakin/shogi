@@ -1,0 +1,10 @@
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Claude Code
+.claude/*
+!.claude/public-repo.marker
