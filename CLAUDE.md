@@ -34,12 +34,7 @@ shogi/
 - `MOVES` テーブル: 駒種ごとの移動可能ベクトル
 - `reachableSquares()`: 到達可能マスから from を逆算（棋譜に from 情報がないため）
 
-ローカル動作確認:
-
-```sh
-python3 -m http.server -d ~/Claude/shogi 8000
-# http://localhost:8000/
-```
+ローカル動作確認の手順 (`python3 -m http.server`) は **README の Quick example が正本** (= 公開リポなので run コマンドの home は README。`CONVENTIONS.md` §README の流儀)。
 
 ## 触らない方針
 
